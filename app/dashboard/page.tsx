@@ -29,6 +29,9 @@ import {
   Add as AddIcon,
   FileDownload as FileDownloadIcon,
   Task as TaskIcon,
+  CheckCircleOutline,
+  EditNotifications,
+  Close,
 } from "@mui/icons-material";
 
 // Dynamic import with no SSR to avoid hydration mismatch
@@ -134,7 +137,7 @@ export default function TaskTracker() {
   const [tasks, setTasks] = useState<Task[]>([]);
   // Flag to track if component is mounted (client-side)
   const [isMounted, setIsMounted] = useState(false);
-
+  const [editTaskId, setEditTaskId] = useState<number | null>(null);
   // Set mounted flag on client-side
   useEffect(() => {
     setIsMounted(true);
@@ -160,19 +163,44 @@ export default function TaskTracker() {
     };
 
     try {
-      await fetch("/api/tasks", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(newTask),
-      });
+      if (editTaskId !== null) {
+        // Update existing task
+        await fetch(`/api/tasks/${editTaskId}`, {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(newTask),
+        });
+        const updatedTasks = [...tasks];
+        updatedTasks[editTaskId] = newTask;
+        setTasks(updatedTasks);
+        setEditTaskId(null);
+      } else {
+        // Add new task
+        await fetch("/api/tasks", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(newTask),
+        });
+        setTasks([...tasks, newTask]);
+      }
 
-      setTasks([...tasks, newTask]);
+      // Reset form
       setTask("");
       setTimeWorked("");
       setNotes("");
+      setDate(new Date());
     } catch (err) {
       console.error("Error submitting task:", err);
     }
+  };
+
+  // Add cancel edit function
+  const cancelEdit = () => {
+    setEditTaskId(null);
+    setTask("");
+    setTimeWorked("");
+    setNotes("");
+    setDate(new Date());
   };
 
   const exportToExcel = () => {
@@ -185,13 +213,13 @@ export default function TaskTracker() {
   // Use a consistent date formatting function that won't cause hydration issues
   const formatDate = (dateString: string) => {
     if (!isMounted) return dateString; // Return plain string during SSR
-    
+
     try {
       const date = new Date(dateString);
       // Avoid locale-specific formatting which can cause hydration issues
       return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
     } catch (error) {
-        console.error("Error formatting date:", error);
+      console.error("Error formatting date:", error);
       return dateString;
     }
   };
@@ -203,20 +231,20 @@ export default function TaskTracker() {
 
   return (
     <ThemeProvider theme={theme}>
-      <Box sx={{ 
-        width: '100%', 
-        minHeight: '100vh', 
-        bgcolor: 'background.default', 
+      <Box sx={{
+        width: '100%',
+        minHeight: '100vh',
+        bgcolor: 'background.default',
         py: 6,
         px: { xs: 2, sm: 4, md: 6 }
       }}>
         <style dangerouslySetInnerHTML={{ __html: calendarStyles }} />
         <Container maxWidth="lg">
           <Box sx={{ mb: 5, textAlign: 'center' }}>
-            <Typography 
-              variant="h4" 
-              sx={{ 
-                color: 'primary.main', 
+            <Typography
+              variant="h4"
+              sx={{
+                color: 'primary.main',
                 mb: 1,
                 fontWeight: 700,
                 display: 'flex',
@@ -227,8 +255,8 @@ export default function TaskTracker() {
             >
               <TaskIcon fontSize="large" /> Task Tracker
             </Typography>
-            <Typography 
-              variant="subtitle1" 
+            <Typography
+              variant="subtitle1"
               color="text.secondary"
               sx={{ maxWidth: 600, mx: 'auto' }}
             >
@@ -236,10 +264,10 @@ export default function TaskTracker() {
             </Typography>
           </Box>
 
-          <Paper 
-            elevation={0} 
-            sx={{ 
-              borderRadius: 4, 
+          <Paper
+            elevation={0}
+            sx={{
+              borderRadius: 4,
               overflow: 'hidden',
               boxShadow: '0 10px 40px rgba(0,0,0,0.07)',
               border: '1px solid rgba(0,0,0,0.05)',
@@ -247,24 +275,24 @@ export default function TaskTracker() {
           >
             {/* Tabs Header */}
             <Box sx={{ borderBottom: 1, borderColor: 'divider', bgcolor: 'primary.main' }}>
-              <Tabs 
-                value={tabIndex} 
-                onChange={(_, newValue) => setTabIndex(newValue)} 
+              <Tabs
+                value={tabIndex}
+                onChange={(_, newValue) => setTabIndex(newValue)}
                 variant="fullWidth"
                 textColor="inherit"
-                sx={{ 
-                  '& .MuiTab-root': { 
+                sx={{
+                  '& .MuiTab-root': {
                     color: 'rgba(255,255,255,0.7)',
                     py: 2,
                     fontWeight: 500,
                     fontSize: '1rem',
                     transition: 'all 0.2s ease-in-out',
-                    '&.Mui-selected': { 
+                    '&.Mui-selected': {
                       color: 'white',
                       fontWeight: 600,
                     }
                   },
-                  '& .MuiTabs-indicator': { 
+                  '& .MuiTabs-indicator': {
                     backgroundColor: 'white',
                     height: 3,
                   }
@@ -291,15 +319,15 @@ export default function TaskTracker() {
                         </Box>
                         <Divider sx={{ mb: 3 }} />
                         {/* Calendar is already client-side only due to dynamic import with ssr: false */}
-                        <Calendar 
-                          onChange={(date) => setDate(date as Date)} 
-                          value={date} 
+                        <Calendar
+                          onChange={(date) => setDate(date as Date)}
+                          value={date}
                         />
                         <Box sx={{ mt: 3, textAlign: 'center' }}>
-                          <Chip 
+                          <Chip
                             label={`${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`}
-                            color="primary" 
-                            variant="outlined" 
+                            color="primary"
+                            variant="outlined"
                             sx={{ fontWeight: 500, px: 1 }}
                           />
                         </Box>
@@ -313,7 +341,7 @@ export default function TaskTracker() {
                       <CardContent sx={{ p: 3 }}>
                         <Typography variant="h6" sx={{ mb: 3, display: 'flex', alignItems: 'center' }}>
                           <NoteAltIcon color="primary" sx={{ mr: 1 }} />
-                          Task Details
+                          {editTaskId !== null ? "Edit Task" : "Task Details"}
                         </Typography>
                         <Divider sx={{ mb: 3 }} />
                         <form onSubmit={handleSubmit}>
@@ -366,15 +394,15 @@ export default function TaskTracker() {
                               />
                             </Grid>
                             <Grid item xs={12}>
-                              <Button 
-                                type="submit" 
-                                variant="contained" 
-                                color="primary" 
+                              <Button
+                                type="submit"
+                                variant="contained"
+                                color="primary"
                                 fullWidth
                                 size="large"
-                                sx={{ 
-                                  mt: 2, 
-                                  py: 1.5, 
+                                sx={{
+                                  mt: 2,
+                                  py: 1.5,
                                   fontWeight: 600,
                                   transition: 'all 0.3s ease',
                                   '&:hover': {
@@ -382,10 +410,26 @@ export default function TaskTracker() {
                                     boxShadow: '0 6px 20px rgba(124, 77, 255, 0.4)',
                                   }
                                 }}
-                                startIcon={<AddIcon />}
+                                startIcon={editTaskId !== null ? <CheckCircleOutline /> : <AddIcon />}
                               >
-                                Add Task
-                              </Button>
+                                {editTaskId !== null ? "Update Task" : "Add Task"}
+                              </Button> {editTaskId !== null && (
+                                <Grid item xs={12}>
+                                  <Button
+                                    variant="outlined"
+                                    color="secondary"
+                                    fullWidth
+                                    size="large"
+                                    onClick={cancelEdit}
+                                    sx={{ mt: 2 }}
+                                    startIcon={<Close />}
+                                  >
+                                    Cancel Edit
+                                  </Button>
+                                </Grid>
+                              )}
+
+
                             </Grid>
                           </Grid>
                         </form>
@@ -401,9 +445,9 @@ export default function TaskTracker() {
                       All Tasks
                     </Typography>
                     <Tooltip title="Export to Excel">
-                      <Button 
-                        onClick={exportToExcel} 
-                        variant="outlined" 
+                      <Button
+                        onClick={exportToExcel}
+                        variant="outlined"
                         color="secondary"
                         startIcon={<FileDownloadIcon />}
                         size="small"
@@ -412,15 +456,15 @@ export default function TaskTracker() {
                       </Button>
                     </Tooltip>
                   </Box>
-                  
+
                   <Divider sx={{ mb: 3 }} />
-                  
+
                   {tasks.length === 0 ? (
                     <Card sx={{ p: 4, textAlign: 'center', bgcolor: 'background.default' }}>
                       <Typography color="text.secondary" sx={{ mb: 2 }}>No tasks added yet.</Typography>
-                      <Button 
-                        variant="contained" 
-                        color="primary" 
+                      <Button
+                        variant="contained"
+                        color="primary"
                         onClick={() => setTabIndex(0)}
                         startIcon={<AddIcon />}
                       >
@@ -431,7 +475,7 @@ export default function TaskTracker() {
                     <Grid container spacing={2}>
                       {tasks.map((t, i) => (
                         <Grid item xs={12} md={6} key={i}>
-                          <Card sx={{ 
+                          <Card sx={{
                             transition: 'all 0.3s ease',
                             '&:hover': {
                               transform: 'translateY(-3px)',
@@ -456,10 +500,10 @@ export default function TaskTracker() {
                                   sx={{ fontWeight: 500 }}
                                 />
                               </Box>
-                              
-                              <Typography 
-                                variant="h6" 
-                                sx={{ 
+
+                              <Typography
+                                variant="h6"
+                                sx={{
                                   mt: 2,
                                   fontSize: '1.1rem',
                                   fontWeight: 600,
@@ -468,15 +512,15 @@ export default function TaskTracker() {
                               >
                                 {t.task}
                               </Typography>
-                              
+
                               {t.notes && (
                                 <Box sx={{ mt: 2, bgcolor: 'grey.50', p: 2, borderRadius: 2 }}>
-                                  <Typography 
-                                    variant="body2" 
+                                  <Typography
+                                    variant="body2"
                                     color="text.secondary"
-                                    sx={{ 
-                                      display: 'flex', 
-                                      alignItems: 'flex-start' 
+                                    sx={{
+                                      display: 'flex',
+                                      alignItems: 'flex-start'
                                     }}
                                   >
                                     <NoteAltIcon sx={{ fontSize: 18, mr: 1, mt: 0.3 }} />
@@ -484,6 +528,24 @@ export default function TaskTracker() {
                                   </Typography>
                                 </Box>
                               )}
+                              <Box sx={{ display: 'flex', justifyContent: 'flex-end', mt: 2, gap: 1 }}>
+                                <Button
+                                  variant="outlined"
+                                  color="primary"
+                                  size="small"
+                                  onClick={() => {
+                                    setTabIndex(0);
+                                    setEditTaskId(i);
+                                    setDate(new Date(t.date));
+                                    setTask(t.task);
+                                    setTimeWorked(t.timeWorked);
+                                    setNotes(t.notes);
+                                  }}
+                                  startIcon={<EditNotifications />}
+                                >
+                                  Edit
+                                </Button>
+                              </Box>
                             </CardContent>
                           </Card>
                         </Grid>
