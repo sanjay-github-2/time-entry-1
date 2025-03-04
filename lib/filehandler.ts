@@ -1,30 +1,26 @@
-import fs from "fs";
-import path from "path";
+import { MongoClient, ServerApiVersion } from "mongodb";
 
-// Define Task Type
-export interface Task {
-  id: string;
-  date: string; // Format: YYYY-MM-DD
-  task: string; // Task name (this was missing)
-  timeWorked: number; // Hours worked
-  notes: string;
+const uri = "mongodb+srv://sanjaygouda2109:Sanjay21@timetracker.p5d4d.mongodb.net/?retryWrites=true&w=majority&tls=true";
+
+if (!uri) {
+  throw new Error("❌ MongoDB URI is missing!");
 }
 
-// Path to the tasks.json file inside the `data/` folder
-const filePath = path.join(process.cwd(), "data", "tasks.json");
-console.log(filePath);
-// Function to read tasks from tasks.json
-export function readTasks(): Task[] {
-  try {
-    const data = fs.readFileSync(filePath, "utf8");
-    return JSON.parse(data) as Task[];
-  } catch (error) {
-    console.error("Error reading tasks file:", error);
-    return [];
-  }
-}
+// MongoDB Client Singleton (for reuse)
+const client = new MongoClient(uri, {
+  serverApi: {
+    version: ServerApiVersion.v1,
+    strict: true,
+    deprecationErrors: true,
+  },
+  tls: true, // Ensure TLS is enabled
+});
 
-// Function to write tasks to tasks.json
-export function writeTasks(tasks: Task[]): void {
-  fs.writeFileSync(filePath, JSON.stringify(tasks, null, 2), "utf8");
-}
+// Export a promise to ensure a single connection instance
+export const clientPromise = client.connect().then(() => {
+  console.log("✅ MongoDB Connected!");
+  return client;
+}).catch((error) => {
+  console.error("❌ MongoDB Connection Error:", error);
+  throw error;
+});
