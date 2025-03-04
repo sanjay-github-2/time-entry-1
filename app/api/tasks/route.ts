@@ -1,14 +1,21 @@
 import { NextRequest, NextResponse } from "next/server";
-import { readTasks, writeTasks, Task } from "../../../lib/filehandler";
-import { v4 as uuidv4 } from "uuid";
+import {clientPromise} from "../../../lib/filehandler";
 
 export async function GET() {
   try {
-    const tasks: Task[] = readTasks();
+    const client = await clientPromise;
+
+    console.log("client", client);
+    
+    const db = client.db("timeentry");
+
+
+    const tasks = await db.collection("tasks").find({}).toArray();
+
     return NextResponse.json(tasks, { status: 200 });
   } catch (error) {
-    console.error("Error reading tasks:", error);
-    return NextResponse.json({ message: "Error reading tasks" }, { status: 500 });
+    console.error("Error fetching tasks:", error);
+    return NextResponse.json({ message: "Error fetching tasks" }, { status: 500 });
   }
 }
 
@@ -21,17 +28,21 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ message: "Missing required fields" }, { status: 400 });
     }
 
-    const newTask: Task = {
-      id: uuidv4(),
+    const client = await clientPromise;
+
+    console.log("--------------------------------",client);
+    
+    const db = client.db("timeentry");
+
+    const newTask = {
       date,
       task,
       timeWorked: Number(timeWorked),
       notes: notes || "",
+      createdAt: new Date(),
     };
 
-    const tasks: Task[] = readTasks();
-    tasks.push(newTask);
-    writeTasks(tasks);
+    await db.collection("tasks").insertOne(newTask);
 
     return NextResponse.json({ message: "Task saved!", task: newTask }, { status: 200 });
   } catch (error) {
